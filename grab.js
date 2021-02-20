@@ -49,14 +49,12 @@ var MoveGrab = class MoveGrab {
         let actor = metaWindow.get_compositor_private();
         let [gx, gy, $] = global.get_pointer();
         let px = (gx - actor.x) / actor.width;
-        let py = (gy - actor.y) / actor.height;
-        actor.set_pivot_point(px, py);
+        actor.set_pivot_point(px, 0);
 
         let clone = metaWindow.clone;
-        let [x, y] = space.globalToScroll(gx, gy);
+        let [x, y] = space.globalToScroll(gx, 0);
         px = (x - clone.x) / clone.width;
-        py = (y - clone.y) / clone.height;
-        clone.set_pivot_point(px, py);
+        clone.set_pivot_point(px, 0);
 
         this.scrollAnchor = metaWindow.clone.targetX + space.monitor.x;
         this.signals.connect(
@@ -80,13 +78,11 @@ var MoveGrab = class MoveGrab {
         space.targetX = frame.x - this.scrollAnchor;
         space.cloneContainer.x = space.targetX;
 
-        const threshold = 300;
-        const dy = Math.min(threshold, Math.abs(frame.y - this.initialY));
-        let s = 1 - Math.pow(dy / 500, 3);
+        let s = 1 - Math.pow(0 / 500, 3);
         let actor = metaWindow.get_compositor_private();
         actor.set_scale(s, s);
         clone.set_scale(s, s);
-        [clone.x, clone.y] = space.globalToScroll(frame.x, frame.y);
+        [clone.x, clone.y] = space.globalToScroll(frame.x, 0);
     }
 
     end() {
@@ -104,7 +100,7 @@ var MoveGrab = class MoveGrab {
 
         this.initialSpace.layout();
 
-        let monitor = monitorAtPoint(gx, gy);
+        let monitor = monitorAtPoint(gx, 0);
         let space = Tiling.spaces.monitors.get(monitor);
 
         // Make sure the window is on the correct workspace.
