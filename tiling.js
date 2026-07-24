@@ -525,6 +525,51 @@ export class Space extends Array {
         };
     }
 
+    /**
+     * Returns the workArea adjusted for the topbar / window position bar, i.e. the
+     * area tiled windows are actually laid out in.  Clone coordinates are relative
+     * to this, so overlays drawn in the cloneContainer (eg. the drag-and-drop zone
+     * previews in grab.js) need it to line up with the tiling.
+     * @returns object with x, y, width, and height values.
+     */
+    tilingArea() {
+        let workArea = this.workArea();
+
+        /**
+         * If current window is fullscreened, then treat workarea as fullscreen (y = 0).
+         * This a "flash of topbar spacing") before consecutive layout call resolves.
+         */
+        const panelBoxHeight = Topbar.panelBox.height;
+        const primaryMonitor = Main.layoutManager.primaryMonitor;
+        switch (true) {
+        case this.selectedWindow?.fullscreen:
+            workArea.y = 0;
+            break;
+        case this.monitor === primaryMonitor: {
+            if (!this.showTopBar) {
+                // remove panelbox height
+                workArea.y -= panelBoxHeight;
+                workArea.height += panelBoxHeight;
+
+                if (this.showPositionBar) {
+                    // add panelbox height if need to show window position bar
+                    workArea.y += panelBoxHeight;
+                    workArea.height -= panelBoxHeight;
+                }
+            }
+            break;
+        }
+        default:
+            if (this.showPositionBar) {
+                workArea.y += panelBoxHeight;
+                workArea.height -= panelBoxHeight;
+            }
+            break;
+        }
+
+        return workArea;
+    }
+
     layoutGrabColumn(column, x, y0, targetWidth, availableHeight, time, grabWindow) {
         let space = this;
         let needRelayout = false;
@@ -666,7 +711,7 @@ export class Space extends Array {
         let gap = Settings.prefs.window_gap;
         let x = gap; // init (ensures autostart apps in particular start properly gapped)
         let selectedIndex = this.selectedIndex();
-        let workArea = this.workArea();
+        let workArea = this.tilingArea();
 
         // Happens on monitors-changed
         if (workArea.width === 0) {
@@ -674,37 +719,8 @@ export class Space extends Array {
             return;
         }
 
-        /**
-         * If current window is fullscreened, then treat workarea as fullscreen (y = 0).
-         * This a "flash of topbar spacing") before consecutive layout call resolves.
-         */
-        const panelBoxHeight = Topbar.panelBox.height;
-        const primaryMonitor = Main.layoutManager.primaryMonitor;
-        switch (true) {
-        case this.selectedWindow?.fullscreen:
-            workArea.y = 0;
+        if (this.selectedWindow?.fullscreen) {
             this.setSpaceTopbarElementsVisible(false);
-            break;
-        case this.monitor === primaryMonitor: {
-            if (!this.showTopBar) {
-                // remove panelbox height
-                workArea.y -= panelBoxHeight;
-                workArea.height += panelBoxHeight;
-
-                if (this.showPositionBar) {
-                    // add panelbox height if need to show window position bar
-                    workArea.y += panelBoxHeight;
-                    workArea.height -= panelBoxHeight;
-                }
-            }
-            break;
-        }
-        default:
-            if (this.showPositionBar) {
-                workArea.y += panelBoxHeight;
-                workArea.height -= panelBoxHeight;
-            }
-            break;
         }
 
         let availableHeight = workArea.height;

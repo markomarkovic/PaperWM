@@ -219,11 +219,13 @@ export class MoveGrab {
         const rowZoneMargin = 250 + halfGap;
 
         let target = null;
-        const tilingHeight = space.height - Main.layoutManager.panelBox.height;
+        // Same area `layout` tiles into, so zone previews line up with the windows.
+        const tilingArea = space.tilingArea();
+        const tilingHeight = tilingArea.height;
 
         let fakeClone = {
             targetX: null,
-            targetY: 0,
+            targetY: tilingArea.y,
             width: columnZoneMargin,
             height: tilingHeight,
         };
@@ -266,7 +268,7 @@ export class MoveGrab {
                     marginB: columnZoneMarginViz,
                     space,
                     actorParams: {
-                        y: Main.layoutManager.panelBox.height,
+                        y: tilingArea.y,
                         height: tilingHeight,
                     },
                 };
@@ -446,7 +448,12 @@ export class MoveGrab {
         let clone = metaWindow.clone;
         let [gx, gy] = global.get_pointer();
 
-        this.zoneActors.forEach(actor => actor.destroy());
+        // Clear before destroying: destroy stops the shrink transition, which runs
+        // `onStopped` re-entrantly, and that bails out once the actor is untracked.
+        const zoneActors = [...this.zoneActors];
+        this.zoneActors.clear();
+        this.dndTargets = [];
+        zoneActors.forEach(actor => actor.destroy());
         let params = {
             time: Settings.prefs.animation_time,
             scale_x: 1,
@@ -584,6 +591,11 @@ export class MoveGrab {
 
     activateDndTarget(zone, first) {
         if (!zone) {
+            // Pointer left every drop zone: tear down the preview, otherwise it
+            // stays behind and `end` drops the window into a stale target.
+            this.dndTargets.forEach(t => this.deactivateDndTarget(t));
+            this.dndTargets = [];
+            this.dndTarget = null;
             return;
         }
         const mkZoneActor = props => {
@@ -635,15 +647,19 @@ export class MoveGrab {
     }
 
     deactivateDndTarget(zone) {
-        if (zone) {
+        if (zone?.actor) {
             zone.space.showSelection();
-            Easer.addEase(zone.actor, {
+            const actor = zone.actor;
+            zone.actor = null;
+            Easer.addEase(actor, {
                 time: Settings.prefs.animation_time,
                 [zone.originProp]: zone.center,
                 [zone.sizeProp]: 0,
-                onComplete: () => {
-                    zone.actor.destroy();
-                    this.zoneActors.delete(zone.actor);
+                // NOTE: onStopped (not onComplete) so an interrupted shrink
+                // animation still destroys the actor instead of leaking it.
+                // `delete` is the guard against destroying it twice.
+                onStopped: () => {
+                    this.zoneActors.delete(actor) && actor.destroy();
                 },
             });
         }
