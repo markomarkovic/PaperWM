@@ -813,8 +813,10 @@ export class Space extends Array {
             this.moveDone();
         }
 
-        // if only one column on space, then center it
-        if (centerIfOne && this.length === 1) {
+        // if only one column on space, then center it.  Not in DEFAULT focus mode:
+        // there a lone window should stay where the user put it (`addWindow` still
+        // centers it when it's first added).  CENTER and EDGE want it centered.
+        if (centerIfOne && this.length === 1 && this.focusMode !== FocusModes.DEFAULT) {
             const mw = this.getWindows()[0];
             centerWindow(mw);
         }
@@ -989,6 +991,10 @@ export class Space extends Array {
         if (this.length === 1) {
             let workArea = this.workArea();
             this.targetX = workArea.x + Math.round((workArea.width - this.cloneContainer.width) / 2);
+            // Keep cloneContainer in sync: `moveDone` bails while they differ,
+            // leaving the background tracked as chrome and eating all input.
+            Easer.removeEase(this.cloneContainer);
+            this.cloneContainer.x = this.targetX;
         }
         this.emit('window-added', metaWindow, index, row);
         return true;
@@ -3911,7 +3917,7 @@ export function resizeHandler(metaWindow) {
         space.queueLayout(true, { callback, centerIfOne: false });
     }
 
-    if (space.length === 1) {
+    if (space.length === 1 && space.focusMode !== FocusModes.DEFAULT) {
         centerWindow(metaWindow);
     }
 }
